@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\Position;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Employee;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 // untuk mendefinisikan relasi antara employee dengan position
 class Employee extends Model
 {

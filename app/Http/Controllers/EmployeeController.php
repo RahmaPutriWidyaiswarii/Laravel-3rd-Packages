@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use App\Models\Employee;
 use App\Models\Position;
+use Illuminate\Support\Str;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class EmployeeController extends Controller
 {
@@ -71,24 +74,24 @@ class EmployeeController extends Controller
     public function store(Request $request)
     {
         // Mendefinisikan pesan kesalahan untuk validasi input
-        $messages = [
-            'required' => ':attribute harus diisi.',
-            'email' => 'Isi :attribute dengan format yang benar.',
-            'numeric' => 'Isi :attribute dengan angka.'
-        ];
+        // $messages = [
+        //     'required' => ':attribute harus diisi.',
+        //     'email' => 'Isi :attribute dengan format yang benar.',
+        //     'numeric' => 'Isi :attribute dengan angka.'
+        // ];
 
         // Validasi input menggunakan Validator
-        $validator = Validator::make($request->all(), [
-            'firstName' => 'required',
-            'lastName' => 'required',
-            'email' => 'required|email',
-            'age' => 'required|numeric',
-        ], $messages);
+        // $validator = Validator::make($request->all(), [
+        //     'firstName' => 'required',
+        //     'lastName' => 'required',
+        //     'email' => 'required|email',
+        //     'age' => 'required|numeric',
+        // ], $messages);
 
         // Jika terdapat kesalahan validasi, kembalikan kembali ke halaman sebelumnya dengan pesan kesalahan dan input yang diisi sebelumnya
-        if ($validator->fails()) {
-            return redirect()->back()->withErrors($validator)->withInput();
-        }
+        // if ($validator->fails()) {
+        //     return redirect()->back()->withErrors($validator)->withInput();
+        // }
 
         // // INSERT QUERY
         // DB::table('employees')->insert([
@@ -108,11 +111,56 @@ class EmployeeController extends Controller
             $employee->age = $request->age;
             $employee->position_id = $request->position;
         // ketika validasi berhasil data akan di simpan, $employee->save() digunakan untuk menyimpan data karyawan tersebut ke dalam database.
-            $employee->save();
+            // $employee->save();
         /**
          * setelah data karyawan berhasil disimpan, pengguna akan diarahkan ke halaman indeks (daftar) karyawan menggunakan perintah
          * redirect()->route('employees.index'). Halaman ini diarahkan melalui rute dengan nama "employees.index".
          */
+
+        // return redirect()->route('employees.index');
+
+        $messages = [
+            'required' => ':Attribute harus diisi.',
+            'email' => 'Isi :attribute dengan format yang benar',
+            'numeric' => 'Isi :attribute dengan angka'
+        ];
+
+        $validator = Validator::make($request->all(), [
+            'firstName' => 'required',
+            'lastName' => 'required',
+            'email' => 'required|email',
+            'age' => 'required|numeric',
+        ], $messages);
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator)->withInput();
+        }
+
+        // Get File
+        $file = $request->file('cv');
+
+        if ($file != null) {
+            $originalFilename = $file->getClientOriginalName();
+            $encryptedFilename = $file->hashName();
+
+            // Store File
+            $file->store('public/files');
+        }
+
+        // ELOQUENT
+        $employee = New Employee;
+        $employee->firstname = $request->firstName;
+        $employee->lastname = $request->lastName;
+        $employee->email = $request->email;
+        $employee->age = $request->age;
+        $employee->position_id = $request->position;
+
+        if ($file != null) {
+            $employee->original_filename = $originalFilename;
+            $employee->encrypted_filename = $encryptedFilename;
+        }
+
+        $employee->save();
 
         return redirect()->route('employees.index');
     }
@@ -170,15 +218,19 @@ class EmployeeController extends Controller
         //     ->first();
 
         // $positions = DB::table('positions')->get();
-         // ELOQUENT
-        // Mengambil semua data posisi (positions) dari model Position
+        //  // ELOQUENT
+        // // Mengambil semua data posisi (positions) dari model Position
+        // $positions = Position::all();
+        // // Mengambil data karyawan dengan ID yang sesuai
+        // $employee = Employee::find($id);
+        // // mengembalikan tampilan employee edit
+        // return view('employee.edit', compact('pageTitle', 'employee', 'positions'));
+
+        // ELOQUENT
         $positions = Position::all();
-        // Mengambil data karyawan dengan ID yang sesuai
         $employee = Employee::find($id);
-        // mengembalikan tampilan employee edit
+
         return view('employee.edit', compact('pageTitle', 'employee', 'positions'));
-
-
     }
 
     /**
@@ -206,38 +258,90 @@ class EmployeeController extends Controller
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator)->withInput();
         }
+        // Get File
+        $file = $request->file('cv');
 
-        // UPDATE QUERY
-        DB::table('employees')
-            ->where('id', $id)
-            ->update([
-                'firstname' => $request->firstName,
-                'lastname' => $request->lastName,
-                'email' => $request->email,
-                'age' => $request->age,
-                'position_id' => $request->position,
-            ]);
+        // kondisi 1 save lanjut hapus
+        if ($file != null) {
+            $originalFilename = $file->getClientOriginalName();
+            $encryptedFilename = $file->hashName();
+
+            // Store File
+            $file->store('public/files');
+
+            // Hapus file lama jika ada
+            $employee = Employee::find($id);
+            if ($employee->encrypted_filename) {
+                Storage::delete('public/files/'.$employee->encrypted_filename);
+            }
+        }
+
+        // // logic 2 hapus lanjut save
+        // if ($file != null) {
+        //     $employee = Employee::find($id);
+        //     $encryptedFilename = 'public/files/'.$employee->encrypted_filename;
+        //     Storage::delete($encryptedFilename);
+        // }
+        // if ($file != null) {
+        //     $originalFilename = $file->getClientOriginalName();
+        //     $encryptedFilename = $file->hashName();
+
+        //     // Store File
+        //     $file->store('public/files');
+        // }
+
+        // ELOQUENT
+        $employee = Employee::find($id);
+        $employee->firstname = $request->input('firstName');
+        $employee->lastname = $request->input('lastName');
+        $employee->email = $request->input('email');
+        $employee->age = $request->input('age');
+        $employee->position_id = $request->input('position');
+
+        if ($file != null) {
+            $employee->original_filename = $originalFilename;
+            $employee->encrypted_filename = $encryptedFilename;
+        }
+
+        $employee->save();
 
         return redirect()->route('employees.index');
     }
-
 
     /**
      * Remove the specified resource from storage.
      */
     public function destroy(string $id)
     {
-        //menghapus data employees
-        // QUERY BUILDER
-        // DB::table('employees')
-        // ->where('id', $id)
-        // ->delete();
+        // ELOQUENT
+        $employee = Employee::find($id);
 
-         // ELOQUENT
-        // menghapus data karyawan berdasarkan ID
-        Employee::find($id)->delete();
-        // Setelah data karyawan berhasil dihapus, code ini akan mengarahkan ke halaman daftar karyawan
+        // // Hapus file terkait tidak menggunakan path jika ada
+        // if ($employee->encrypted_filename) {
+        //     Storage::delete('public/files/'.$employee->encrypted_filename);
+        // }
+
+        // Hapus file terkait menggunakan path jika ada
+        if ($employee->encrypted_filename) {
+            $path = 'files/'.$employee->encrypted_filename;
+            Storage::disk('public')->delete($path);
+        }
+
+        $employee->delete();
+
         return redirect()->route('employees.index');
-
     }
+
+
+    public function downloadFile($employeeId)
+    {
+        $employee = Employee::find($employeeId);
+        $encryptedFilename = 'public/files/'.$employee->encrypted_filename;
+        $downloadFilename = Str::lower($employee->firstname.'_'.$employee->lastname.'_cv.pdf');
+
+        if(Storage::exists($encryptedFilename)) {
+            return Storage::download($encryptedFilename, $downloadFilename);
+        }
+    }
+
 }
